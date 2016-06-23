@@ -29,8 +29,9 @@
 
 typedef struct object_surface {
     struct object_base  base;
-    VAImage             image;
     VAContextID         context_id;
+    VAImage             image;
+    VABufferID          coded_buffer;
 } object_surface_t, *object_surface_p;
 
 VAStatus rockchip_CreateSurfaces(VADriverContextP ctx, int width, int height, int format, int num_surfaces, VASurfaceID *surfaces);

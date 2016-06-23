@@ -66,6 +66,7 @@ VAStatus rockchip_InitEncoder(
 
     obj_context->enc_ctx->width = obj_context->picture_width;
     obj_context->enc_ctx->height = obj_context->picture_height;
+    obj_context->streaming = 0;
 
     if (v4l2_s_fmt(obj_context->enc_ctx) < 0)
         goto failed_v4l2;
@@ -74,9 +75,6 @@ VAStatus rockchip_InitEncoder(
         goto failed_v4l2;
 
     if (v4l2_querybuf(obj_context->enc_ctx) < 0)
-        goto failed_v4l2;
-
-    if (v4l2_streamon(obj_context->enc_ctx) < 0)
         goto failed_v4l2;
 
     return VA_STATUS_SUCCESS;
@@ -283,25 +281,25 @@ VAStatus rockchip_DoEncode(
     object_buffer_p obj_buffer = BUFFER(obj_surface->image.buf);
     ASSERT(obj_buffer);
 
+    if (!obj_context->streaming) {
+        if (v4l2_streamon(obj_context->enc_ctx) < 0)
+            return VA_STATUS_ERROR_UNKNOWN;
+
+        if (v4l2_qbuf_output(obj_context->enc_ctx) < 0)
+            return VA_STATUS_ERROR_UNKNOWN;
+
+        obj_context->streaming = 1;
+    } else {
+        log_time("before dq input");
+        v4l2_dqbuf_input(obj_context->enc_ctx);
+    }
+
     log_time("start encode");
     v4l2_qbuf_input(obj_context->enc_ctx, obj_buffer->buffer_data,
             obj_buffer->buffer_size);
-    log_time("after q input");
+    log_time("after queue input");
 
-    v4l2_qbuf_output(obj_context->enc_ctx);
-    v4l2_dqbuf_input(obj_context->enc_ctx);
-    v4l2_dqbuf_output(obj_context->enc_ctx);
-    log_time("after encode");
-
-    obj_buffer = BUFFER(obj_context->h264_params.coded_buf);
-    ASSERT(obj_buffer);
-
-    coded_buffer_segment_p segment =
-        (coded_buffer_segment_p) obj_buffer->buffer_data;
-
-    memcpy(segment->base.buf, obj_context->enc_ctx->coded_buffer,
-            obj_context->enc_ctx->coded_size);
-    segment->base.size = obj_context->enc_ctx->coded_size;
+    obj_surface->coded_buffer = obj_context->h264_params.coded_buf;
 
     obj_context->current_render_target = -1;
 
@@ -322,7 +320,24 @@ VAStatus rockchip_SyncEncoder(
     obj_context = CONTEXT(obj_surface->context_id);
     ASSERT(obj_context);
 
+    log_time("before dque out\n");
+    v4l2_dqbuf_output(obj_context->enc_ctx);
+    log_time("after encode");
+
+    object_buffer_p obj_buffer = BUFFER(obj_surface->coded_buffer);
+    ASSERT(obj_buffer);
+
+    coded_buffer_segment_p segment =
+        (coded_buffer_segment_p) obj_buffer->buffer_data;
+
+    memcpy(segment->base.buf, obj_context->enc_ctx->coded_buffer,
+            obj_context->enc_ctx->coded_size);
+    segment->base.size = obj_context->enc_ctx->coded_size;
+
+    v4l2_qbuf_output(obj_context->enc_ctx);
+
     obj_surface->context_id = VA_INVALID_ID;
+    obj_surface->coded_buffer = VA_INVALID_ID;
 
     return VA_STATUS_SUCCESS;
 }

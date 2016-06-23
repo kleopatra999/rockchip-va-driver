@@ -97,6 +97,7 @@ typedef struct object_context {
     int                 num_render_targets;
     int                 flags;
     VASurfaceID        *render_targets;
+    int                 streaming;
 
     enc_context_p       enc_ctx;
 

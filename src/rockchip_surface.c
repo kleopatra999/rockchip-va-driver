@@ -61,6 +61,7 @@ VAStatus rockchip_CreateSurfaces(
             break;
 
         obj_surface->context_id = VA_INVALID_ID;
+        obj_surface->coded_buffer = VA_INVALID_ID;
     }
 
     /* Error recovery */
