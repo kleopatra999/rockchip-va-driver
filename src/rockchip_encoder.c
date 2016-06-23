@@ -249,6 +249,21 @@ VAStatus rockchip_ProcessMiscParam(VADriverContextP ctx, VAContextID context, VA
 
     return VA_STATUS_SUCCESS;
 }
+struct timeval last_tv;
+struct timeval tv;
+
+void log_time(char *msg)
+{
+#define TIME_TO_MS(tv) (tv.tv_sec * 1000 + tv.tv_usec / 1000)
+#define DURATION(tv1, tv2) (TIME_TO_MS(tv2) - TIME_TO_MS(tv1))
+
+    if (getenv("LOG_TIME")) {
+        gettimeofday(&tv, NULL);
+        if (msg)
+            printf("\n%s: %ld ms\n", msg, DURATION(last_tv, tv));
+        last_tv = tv;
+    }
+}
 
 VAStatus rockchip_DoEncode(
     VADriverContextP ctx,
@@ -268,12 +283,15 @@ VAStatus rockchip_DoEncode(
     object_buffer_p obj_buffer = BUFFER(obj_surface->image.buf);
     ASSERT(obj_buffer);
 
+    log_time("start encode");
     v4l2_qbuf_input(obj_context->enc_ctx, obj_buffer->buffer_data,
             obj_buffer->buffer_size);
+    log_time("after q input");
 
     v4l2_qbuf_output(obj_context->enc_ctx);
     v4l2_dqbuf_input(obj_context->enc_ctx);
     v4l2_dqbuf_output(obj_context->enc_ctx);
+    log_time("after encode");
 
     obj_buffer = BUFFER(obj_context->h264_params.coded_buf);
     ASSERT(obj_buffer);
