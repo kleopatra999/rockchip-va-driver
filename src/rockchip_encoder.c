@@ -129,9 +129,20 @@ VAStatus rockchip_ProcessSPS(VADriverContextP ctx, VAContextID context, VABuffer
     VAEncSequenceParameterBufferH264 *sps;
     sps = (VAEncSequenceParameterBufferH264 *) obj_buffer->buffer_data;
 
-    /**
-     * TODO: Convert sps into encode_params_h264
-     */
+    struct v4l2_ext_controls *ext_ctrls;
+
+    obj_context->ctrl[0].id = V4L2_CID_PRIVATE_ROCKCHIP_VAENC_SPS;
+    obj_context->ctrl[0].ptr = sps;
+    obj_context->ctrl[0].size = sizeof(*sps);
+
+    ext_ctrls = calloc(1, sizeof(*ext_ctrls));
+    ext_ctrls->ctrl_class = 0;
+    ext_ctrls->count = 1;
+    ext_ctrls->controls = &obj_context->ctrl[0];
+
+    v4l2_s_ext_ctrls(obj_context->enc_ctx, ext_ctrls);
+
+    free(ext_ctrls);
 
     return VA_STATUS_SUCCESS;
 }
@@ -158,9 +169,20 @@ VAStatus rockchip_ProcessPPS(VADriverContextP ctx, VAContextID context, VABuffer
     VAEncPictureParameterBufferH264 *pps;
     pps = (VAEncPictureParameterBufferH264 *) obj_buffer->buffer_data;
 
-    /**
-     * TODO: Convert pps into encode_params_h264
-     */
+    struct v4l2_ext_controls *ext_ctrls;
+
+    obj_context->ctrl[0].id = V4L2_CID_PRIVATE_ROCKCHIP_VAENC_PPS;
+    obj_context->ctrl[0].ptr = pps;
+    obj_context->ctrl[0].size = sizeof(*pps);
+
+    ext_ctrls = calloc(1, sizeof(*ext_ctrls));
+    ext_ctrls->ctrl_class = 0;
+    ext_ctrls->count = 1;
+    ext_ctrls->controls = &obj_context->ctrl[0];
+
+    v4l2_s_ext_ctrls(obj_context->enc_ctx, ext_ctrls);
+    free(ext_ctrls);
+
     obj_context->h264_params.coded_buf = pps->coded_buf;
 
     return VA_STATUS_SUCCESS;
@@ -186,6 +208,20 @@ VAStatus rockchip_ProcessSliceParam(VADriverContextP ctx, VAContextID context, V
     /**
      * TODO: Convert slice_param into encode_params_h264
      */
+
+    struct v4l2_ext_controls *ext_ctrls;
+
+    obj_context->ctrl[0].id = V4L2_CID_PRIVATE_ROCKCHIP_VAENC_SLICE;
+    obj_context->ctrl[0].ptr = slice_param;
+    obj_context->ctrl[0].size = sizeof(*slice_param);
+
+    ext_ctrls = calloc(1, sizeof(*ext_ctrls));
+    ext_ctrls->ctrl_class = 0;
+    ext_ctrls->count = 1;
+    ext_ctrls->controls = &obj_context->ctrl[0];
+
+    v4l2_s_ext_ctrls(obj_context->enc_ctx, ext_ctrls);
+    free(ext_ctrls);
 
     return VA_STATUS_SUCCESS;
 }
@@ -221,9 +257,34 @@ VAStatus rockchip_ProcessMiscParam(VADriverContextP ctx, VAContextID context, VA
     switch (misc_param->type) {
     case VAEncMiscParameterTypeFrameRate:
         frame_rate = (VAEncMiscParameterFrameRate *)obj_buffer->buffer_data;
+
+	struct v4l2_streamparm parms;
+	memset(&parms, 0, sizeof(parms));
+	parms.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+	// Note that we are provided "frames per second" but V4L2 expects "time per
+	// frame"; hence we provide the reciprocal of the framerate here.
+	parms.parm.output.timeperframe.numerator = 1;
+	parms.parm.output.timeperframe.denominator = frame_rate->framerate;
+
+	v4l2_s_parm(obj_context->enc_ctx, &parms);
+
         break;
     case VAEncMiscParameterTypeRateControl:
         rate_control = (VAEncMiscParameterRateControl *)obj_buffer->buffer_data;
+
+        struct v4l2_ext_controls *ext_ctrls;
+
+        obj_context->ctrl[0].id = V4L2_CID_PRIVATE_ROCKCHIP_VAENC_RC;
+        obj_context->ctrl[0].ptr = rate_control;
+        obj_context->ctrl[0].size = sizeof(*rate_control);
+
+        ext_ctrls = calloc(1, sizeof(*ext_ctrls));
+        ext_ctrls->ctrl_class = 0;
+        ext_ctrls->count = 1;
+        ext_ctrls->controls = &obj_context->ctrl[0];
+
+        v4l2_s_ext_ctrls(obj_context->enc_ctx, ext_ctrls);
+
         break;
     case VAEncMiscParameterTypeAIR:
 #if 0

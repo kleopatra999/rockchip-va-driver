@@ -105,6 +105,8 @@ typedef struct object_context {
         encode_params_h264_t h264_params;
     };
 
+    struct v4l2_ext_control ctrl[5];
+
 } object_context_t, *object_context_p;
 
 #endif /* _ROCKCHIP_DRV_VIDEO_H_ */

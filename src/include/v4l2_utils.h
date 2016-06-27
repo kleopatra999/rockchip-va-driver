@@ -26,6 +26,7 @@
 #define V4l2_UTILS_H
 
 #include "linux/videodev2.h"
+#include "rk_vepu_plugin.h"
 
 typedef struct enc_context {
     void *enc;
@@ -50,6 +51,7 @@ int v4l2_s_fmt(enc_context_p ctx);
 int v4l2_streamon(enc_context_p ctx);
 int v4l2_streamoff(enc_context_p ctx);
 int v4l2_s_ext_ctrls(enc_context_p ctx, struct v4l2_ext_controls* ext_ctrls);
+int v4l2_s_parm(enc_context_p ctx, struct v4l2_streamparm *parm);
 int v4l2_qbuf_input(enc_context_p ctx, void *data, int size);
 int v4l2_qbuf_output(enc_context_p ctx);
 int v4l2_dqbuf_input(enc_context_p ctx);

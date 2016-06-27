@@ -236,6 +236,12 @@ int v4l2_s_ext_ctrls(enc_context_p ctx, struct v4l2_ext_controls* ext_ctrls) {
     return 0;
 }
 
+int v4l2_s_parm(enc_context_p ctx, struct v4l2_streamparm *parm) {
+    IOCTL_OR_ERROR_RETURN(VIDIOC_S_PARM, parm);
+
+    return 0;
+}
+
 int v4l2_qbuf_input(enc_context_p ctx, void *data, int size) {
     struct v4l2_buffer qbuf;
     struct v4l2_plane qbuf_planes[VIDEO_MAX_PLANES];
