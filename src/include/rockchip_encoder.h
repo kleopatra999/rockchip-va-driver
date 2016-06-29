@@ -29,14 +29,10 @@
 
 typedef struct encode_params_h264 {
     VABufferID      coded_buf;
-
-    VASurfaceID     reference_picture;
-    VASurfaceID     reconstructed_picture;
-
+    int             intra_period;
     /**
      * TODO: save more params
      */
-
 } encode_params_h264_t, *encode_params_h264_p;
 
 VAStatus rockchip_InitEncoder(VADriverContextP ctx, VAContextID context);

@@ -45,9 +45,11 @@
 #include "rockchip_encoder.h"
 #include "v4l2_utils.h"
 
-#define ASSERT          assert
-#define EXPORT          __attribute__ ((visibility("default")))
-#define ARRAY_SIZE(x)   (sizeof(x)/sizeof(x[0]))
+#define ASSERT              assert
+#define EXPORT              __attribute__ ((visibility("default")))
+#define ARRAY_SIZE(x)       (sizeof(x)/sizeof(x[0]))
+#define TIME_TO_MS(tv)      (tv.tv_sec * 1000 + tv.tv_usec / 1000)
+#define DURATION(tv1, tv2)  (TIME_TO_MS(tv2) - TIME_TO_MS(tv1))
 
 #define INIT_DRIVER_DATA    struct rockchip_driver_data * const driver_data = (struct rockchip_driver_data *) ctx->pDriverData;
 
@@ -87,6 +89,16 @@ typedef struct object_config {
     int                 attrib_count;
 } object_config_t, *object_config_p;
 
+typedef struct {
+    int             stream_bytes;
+    int             frames;
+    struct timeval  tm;
+
+    int             fps;
+    int             bitrate;
+    int             intra_ratio;
+} encode_statistics_t, *encode_statistics_p;
+
 typedef struct object_context {
     struct object_base  base;
     VAContextID         context_id;
@@ -100,6 +112,7 @@ typedef struct object_context {
     int                 streaming;
 
     enc_context_p       enc_ctx;
+    encode_statistics_t statistics;
 
     union {
         encode_params_h264_t h264_params;

@@ -27,6 +27,18 @@
 #define DEV_NAME_RK3288_NEW     "rockchip-vpu-enc"
 #define DEV_NAME_RK3288_LEGACY  "rk3288-vpu-enc"
 
+#define LOG(fmt, args...) { \
+    FILE *fp = fopen("/tmp/video.log", "a"); \
+    if (fp) { \
+        fprintf(fp, fmt, ## args); \
+        fclose(fp); \
+    } \
+}
+
+#define LOG_DEINIT()
+
+#define LOG_INIT()
+
 /**
  * TODO: Seperate h264 encoder from this
  */
@@ -44,6 +56,8 @@ VAStatus rockchip_DeinitEncoder(
     v4l2_streamoff(obj_context->enc_ctx);
     v4l2_deinit(obj_context->enc_ctx);
 
+    LOG_DEINIT();
+
     return VA_STATUS_SUCCESS;
 }
 
@@ -57,6 +71,8 @@ VAStatus rockchip_InitEncoder(
     obj_context = CONTEXT(context);
     ASSERT(obj_context);
 
+    LOG_INIT();
+
     obj_context->enc_ctx = v4l2_init_by_name(DEV_NAME_RK3288_NEW);
     if (!obj_context->enc_ctx) {
         obj_context->enc_ctx = v4l2_init_by_name(DEV_NAME_RK3288_LEGACY);
@@ -67,6 +83,10 @@ VAStatus rockchip_InitEncoder(
     obj_context->enc_ctx->width = obj_context->picture_width;
     obj_context->enc_ctx->height = obj_context->picture_height;
     obj_context->streaming = 0;
+
+    LOG("resolution:%dx%d\n",
+            obj_context->picture_width, obj_context->picture_height);
+    gettimeofday(&obj_context->statistics.tm, NULL);
 
     if (v4l2_s_fmt(obj_context->enc_ctx) < 0)
         goto failed_v4l2;
@@ -128,6 +148,8 @@ VAStatus rockchip_ProcessSPS(VADriverContextP ctx, VAContextID context, VABuffer
 
     VAEncSequenceParameterBufferH264 *sps;
     sps = (VAEncSequenceParameterBufferH264 *) obj_buffer->buffer_data;
+
+    obj_context->h264_params.intra_period = sps->intra_period;
 
     struct v4l2_ext_controls *ext_ctrls;
 
@@ -313,13 +335,10 @@ struct timeval tv;
 
 void log_time(char *msg)
 {
-#define TIME_TO_MS(tv) (tv.tv_sec * 1000 + tv.tv_usec / 1000)
-#define DURATION(tv1, tv2) (TIME_TO_MS(tv2) - TIME_TO_MS(tv1))
-
     if (getenv("LOG_TIME")) {
         gettimeofday(&tv, NULL);
         if (msg)
-            printf("\n%s: %ld ms\n", msg, DURATION(last_tv, tv));
+            printf("%s: %ld ms\n", msg, DURATION(last_tv, tv));
         last_tv = tv;
     }
 }
@@ -381,7 +400,7 @@ VAStatus rockchip_SyncEncoder(
     obj_context = CONTEXT(obj_surface->context_id);
     ASSERT(obj_context);
 
-    log_time("before dque out\n");
+    log_time("before dque out");
     v4l2_dqbuf_output(obj_context->enc_ctx);
     log_time("after encode");
 
@@ -394,6 +413,34 @@ VAStatus rockchip_SyncEncoder(
     memcpy(segment->base.buf, obj_context->enc_ctx->coded_buffer,
             obj_context->enc_ctx->coded_size);
     segment->base.size = obj_context->enc_ctx->coded_size;
+
+    encode_statistics_p statistics = &obj_context->statistics;
+    statistics->frames ++;
+    statistics->stream_bytes += segment->base.size;
+
+    if (statistics->intra_ratio != obj_context->h264_params.intra_period) {
+        statistics->intra_ratio = obj_context->h264_params.intra_period;
+        LOG("intra_ratio:%d\n", statistics->intra_ratio);
+    }
+
+    struct timeval tm;
+    gettimeofday(&tm, NULL);
+    if (tm.tv_sec != statistics->tm.tv_sec) {
+        int duration = DURATION(statistics->tm, tm);
+
+        if (statistics->fps != statistics->frames) {
+            statistics->fps = statistics->frames;
+            LOG("fps:%d\n", statistics->fps * 1000 / duration);
+        }
+        if (statistics->bitrate != statistics->stream_bytes) {
+            statistics->bitrate = statistics->stream_bytes;
+            LOG("bitrate(KB/S):%d\n",
+                    (statistics->bitrate >> 10) * 1000 / duration);
+        }
+        statistics->frames = 0;
+        statistics->stream_bytes = 0;
+        statistics->tm = tm;
+    }
 
     v4l2_qbuf_output(obj_context->enc_ctx);
 
